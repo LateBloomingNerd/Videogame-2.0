@@ -1,24 +1,35 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sonic Kerst</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Sonic Christmas</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
     <canvas id="view" width="960" height="540"></canvas>
 
-    <!-- Start, winst en game-over delen dit scherm. -->
+    <!-- Start, win, and game over share this card. -->
     <div id="screen">
       <div id="card" class="mode-title">
-        <p id="eyebrow">Green Hill · Kersteditie</p>
-        <h1><span id="h-main">SONIC</span> <span id="h-sub">KERST</span></h1>
-        <p id="lede">Pak ringen — die vangen een klap op — en haal de finish.</p>
+        <p id="eyebrow">Green Hill · Christmas Edition</p>
+        <h1><span id="h-main">SONIC</span> <span id="h-sub">CHRISTMAS</span></h1>
+        <p id="win-line" hidden>Bine jucat! Ai câștigat. Româncă nebunatică ;)</p>
+        <p id="lede">Collect the rings — they absorb a hit — and reach the finish.</p>
         <button id="play" type="button">Start</button>
-        <p id="help">Pijltjes of A/D rennen · spatie of W springen · 3 levens</p>
+        <p id="help">Arrows or A/D to run · Space or W to jump · 3 lives</p>
       </div>
+    </div>
+
+    <!-- On-screen controls for phones and tablets. -->
+    <div id="touch">
+      <div class="pad">
+        <button id="btn-left" type="button" aria-label="Run left">◀</button>
+        <button id="btn-right" type="button" aria-label="Run right">▶</button>
+      </div>
+      <button id="btn-jump" type="button" aria-label="Jump">Jump</button>
     </div>
   </div>
   <script src="game.js"></script>

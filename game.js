@@ -1,4 +1,4 @@
-/* Sonic Kerst
+/* Sonic Christmas
    Korte platformer in de geest van de klassieke Sonic-spellen:
    aanloop, glijden, ringen die een klap opvangen, en een finish.
    Alles is zelf getekend op het canvas. Geen externe plaatjes.
@@ -31,6 +31,8 @@
   const hMain = document.getElementById('h-main');
   const hSub = document.getElementById('h-sub');
   const eyebrowEl = document.getElementById('eyebrow');
+  const winLine = document.getElementById('win-line');
+  const WIN_TEXT = 'Bine jucat! Ai câștigat. Româncă nebunatică ;)';
 
   // Vaste grond. Gaten tussen de stukken zijn afgronden.
   // y groeit naar beneden. y1 is de hoogte aan de rechterkant (helling).
@@ -56,6 +58,11 @@
   let flash = 0;
   let hudPop = 0;
   let actx = null;
+  let musicGain = null;
+  let noiseBuf = null;
+  let musicOn = false;
+  let musicStep = 0;
+  let musicTime = 0;
 
   const cam = { x: 0, y: 0, shake: 0 };
   const player = {
@@ -210,10 +217,10 @@
     ringHump(8280, 8480, 400, 60, 6);
 
     enemies = [
-      { kind: 'bug', x: 1500, y: 460, min: 1420, max: 1760, dir: 1, speed: 1.15, frame: 0, dead: false, puff: 0 },
-      { kind: 'bug', x: 5480, y: 530, min: 5360, max: 5720, dir: -1, speed: 1.3, frame: 0, dead: false, puff: 0 },
-      { kind: 'bomber', x: 3400, y: 460, hop: 0, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
-      { kind: 'bomber', x: 7780, y: 460, hop: 30, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
+      { kind: 'walker', x: 1500, y: 460, min: 1420, max: 1760, dir: 1, speed: 1.05, frame: 0, dead: false, puff: 0 },
+      { kind: 'walker', x: 5480, y: 530, min: 5360, max: 5720, dir: -1, speed: 1.15, frame: 0, dead: false, puff: 0 },
+      { kind: 'thrower', x: 3400, y: 460, hop: 0, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
+      { kind: 'thrower', x: 7780, y: 460, hop: 30, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
     ];
     for (const e of enemies) {
       const gy = groundY(e.x);
@@ -286,6 +293,89 @@
       actx = new AC();
     }
     if (actx.state === 'suspended') actx.resume();
+  }
+
+  // Jingle Bells (publiek domein) in een snel, vierkant chiptune-tempo.
+  const MELODY = [
+    76, 76, 76, 0, 76, 76, 76, 0,
+    76, 79, 72, 74, 76, 0, 0, 0,
+    77, 77, 77, 77, 77, 76, 76, 76,
+    76, 74, 74, 76, 74, 0, 79, 0,
+    76, 76, 76, 0, 76, 76, 76, 0,
+    76, 79, 72, 74, 76, 0, 0, 0,
+    79, 81, 79, 76, 74, 76, 79, 81,
+    84, 0, 79, 76, 74, 72, 0, 0,
+  ];
+  const BASS_ROOT = [36, 36, 41, 43, 36, 36, 36, 43];
+  const MUSIC_STEP = 60 / 156 / 2;
+
+  function midi(n) {
+    return 440 * Math.pow(2, (n - 69) / 12);
+  }
+
+  function startMusic() {
+    ensureAudio();
+    if (!actx || musicOn) return;
+    musicGain = actx.createGain();
+    musicGain.gain.value = 0.9;
+    musicGain.connect(actx.destination);
+    const len = Math.floor(actx.sampleRate * 0.045);
+    noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    musicOn = true;
+    musicStep = 0;
+    musicTime = actx.currentTime + 0.08;
+  }
+
+  function voice(time, note, dur, type, gain, cutoff) {
+    const o = actx.createOscillator();
+    const f = actx.createBiquadFilter();
+    const g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(midi(note), time);
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(cutoff, time);
+    g.gain.setValueAtTime(gain, time);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    o.connect(f).connect(g).connect(musicGain);
+    o.start(time);
+    o.stop(time + dur + 0.03);
+  }
+
+  function sleigh(time) {
+    voice(time, 91, 0.05, 'sine', 0.018, 5000);
+    voice(time + 0.03, 96, 0.04, 'sine', 0.012, 5000);
+    const src = actx.createBufferSource();
+    const f = actx.createBiquadFilter();
+    const g = actx.createGain();
+    src.buffer = noiseBuf;
+    f.type = 'highpass';
+    f.frequency.value = 6000;
+    g.gain.setValueAtTime(0.025, time);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+    src.connect(f).connect(g).connect(musicGain);
+    src.start(time);
+    src.stop(time + 0.04);
+  }
+
+  function scheduleMusic() {
+    if (!musicOn || !actx) return;
+    if (musicTime < actx.currentTime - 0.05) musicTime = actx.currentTime + 0.05;
+    const horizon = actx.currentTime + 0.28;
+    while (musicTime < horizon) {
+      const i = musicStep % MELODY.length;
+      if (MELODY[i]) voice(musicTime, MELODY[i], MUSIC_STEP * 0.9, 'square', 0.05, 2400);
+      const root = BASS_ROOT[Math.floor(i / 8) % BASS_ROOT.length];
+      const step = i % 8;
+      const bass = (step === 1 || step === 5) ? root + 12
+        : (step === 3 || step === 7) ? root + 7
+          : root;
+      voice(musicTime, bass, MUSIC_STEP * 0.85, 'triangle', 0.07, 640);
+      if (i % 2 === 0) sleigh(musicTime);
+      musicTime += MUSIC_STEP;
+      musicStep++;
+    }
   }
 
   function tone(freq, when, dur, type, gain) {
@@ -549,7 +639,7 @@
         e.puff -= 1;
         continue;
       }
-      if (e.kind === 'bug') {
+      if (e.kind === 'walker') {
         const next = e.x + e.dir * e.speed;
         const here = groundY(next);
         const ahead = groundY(next + e.dir * 26);
@@ -605,8 +695,8 @@
     const box = playerBox();
     for (const e of enemies) {
       if (e.dead) continue;
-      const hh = e.kind === 'bug' ? 30 : 42;
-      const hw = e.kind === 'bug' ? 18 : 16;
+      const hh = e.kind === 'walker' ? 72 : 74;
+      const hw = 16;
       const eb = { l: e.x - hw, r: e.x + hw, t: e.y - hh, b: e.y - 2 };
       if (!overlap(box, eb)) continue;
       if (player.vy > 0.3 && player.prevY <= e.y - hh + 12) {
@@ -1458,89 +1548,139 @@
     ctx.restore();
   }
 
-  function drawBug(e) {
+  // Boze oude baboesjka: hoofddoek, schort en een diepe frons.
+  // De springer zwaait met een deegroller en gooit een pantoffel.
+  function drawBabushka(e) {
     if (e.dead && e.puff <= 0) return;
     ctx.save();
     ctx.translate(e.x, e.y);
     if (e.dead) {
       ctx.globalAlpha = Math.max(0, e.puff / 16);
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = '#9d1c34';
       ctx.beginPath();
-      ctx.arc(0, -16, 18 - e.puff, 0, Math.PI * 2);
+      ctx.arc(0, -30, 18, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
       return;
     }
-    ctx.scale(e.dir, 1);
-    const step = Math.sin(e.frame * 0.4) * 3;
-    ctx.fillStyle = '#222';
-    ctx.fillRect(-12, -8, 8, 6);
-    ctx.fillRect(4, -8 + step, 8, 6);
-    ctx.fillStyle = '#178a3a';
+    const wild = e.kind === 'thrower';
+    const face = wild ? e.face : e.dir;
+    ctx.scale(face || 1, 1);
+    const step = Math.sin((e.frame || 0) * 0.45);
+    const hop = wild && !e.onGround ? Math.min(10, -e.vy) : 0;
+    ctx.translate(0, -hop * 0.2);
+
+    ctx.fillStyle = '#2a160e';
+    ctx.fillRect(-14, -8, 10, 7);
+    ctx.fillRect(4, -8 - step * 2, 10, 7);
+
+    ctx.fillStyle = '#3b1024';
     ctx.beginPath();
-    ctx.ellipse(0, -20, 18, 14, 0, 0, Math.PI * 2);
+    ctx.moveTo(-20, -40);
+    ctx.lineTo(20, -40);
+    ctx.lineTo(24, -6);
+    ctx.quadraticCurveTo(0, 4, -24, -6);
     ctx.fill();
-    ctx.fillStyle = '#e10600';
+    ctx.fillStyle = '#e7c56a';
+    ctx.fillRect(-16, -28, 4, 4);
+    ctx.fillRect(6, -22, 4, 4);
+    ctx.fillRect(-4, -16, 4, 4);
+
+    ctx.fillStyle = '#fffaf2';
     ctx.beginPath();
-    ctx.arc(-6, -24, 4, 0, Math.PI * 2);
-    ctx.arc(7, -18, 3.4, 0, Math.PI * 2);
+    ctx.moveTo(-11, -40);
+    ctx.lineTo(11, -40);
+    ctx.lineTo(13, -10);
+    ctx.lineTo(-13, -10);
     ctx.fill();
-    ctx.fillStyle = '#f7fbff';
+    ctx.fillStyle = '#c1121f';
+    ctx.fillRect(-11, -40, 22, 4);
+
+    ctx.strokeStyle = wild ? '#d9d0c2' : '#8a5a32';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.ellipse(0, -30, 12, 5, 0, 0, Math.PI * 2);
+    if (wild) {
+      ctx.moveTo(10, -46);
+      ctx.lineTo(24, -64 - hop * 0.3);
+    } else {
+      ctx.moveTo(-8, -36);
+      ctx.lineTo(-20, -4 + step * 3);
+    }
+    ctx.stroke();
+    if (wild) {
+      ctx.fillStyle = '#efe8dc';
+      ctx.fillRect(20, -76 - hop * 0.3, 6, 16);
+    }
+
+    ctx.fillStyle = '#f3c7a6';
+    ctx.beginPath();
+    ctx.arc(2, -56, 14, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.fillStyle = wild ? '#1c1c1c' : '#b1122a';
+    ctx.beginPath();
+    ctx.moveTo(-18, -58);
+    ctx.lineTo(2, -80);
+    ctx.lineTo(20, -56);
+    ctx.lineTo(16, -42);
+    ctx.lineTo(-14, -42);
+    ctx.fill();
+    const tail = Math.sin(anim * 0.2 + e.x) * 3;
+    ctx.beginPath();
+    ctx.moveTo(8, -48);
+    ctx.lineTo(16, -30 + tail);
+    ctx.lineTo(8, -28 + tail);
+    ctx.fill();
+
+    ctx.fillStyle = '#f3c7a6';
+    ctx.beginPath();
+    ctx.ellipse(6, -54, 8, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1a100c';
+    ctx.beginPath();
+    ctx.moveTo(1, -57);
+    ctx.lineTo(13, -63);
+    ctx.lineTo(14, -58);
+    ctx.lineTo(3, -52);
+    ctx.fill();
+
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(8, -22, 4, 0, Math.PI * 2);
+    ctx.arc(10, -52, 3.1, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = '#1a120c';
     ctx.beginPath();
-    ctx.arc(9, -22, 1.6, 0, Math.PI * 2);
+    ctx.arc(11.2, -52, 1.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ffd24a';
+
+    ctx.strokeStyle = '#6d2030';
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(-16, -30, 3, 0, Math.PI * 2);
+    ctx.arc(9, -45, 4.6, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(186, 42, 42, 0.8)';
+    ctx.beginPath();
+    ctx.arc(15, -49, 2.6, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
 
-  function drawBomber(e) {
-    if (e.dead && e.puff <= 0) return;
+  function drawSlipper(p) {
     ctx.save();
-    ctx.translate(e.x, e.y);
-    if (e.dead) {
-      ctx.globalAlpha = Math.max(0, e.puff / 16);
-      ctx.fillStyle = '#ffd24a';
-      ctx.beginPath();
-      ctx.arc(0, -20, 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      return;
-    }
-    const hop = e.onGround ? 0 : Math.min(8, -e.vy);
-    ctx.translate(0, -hop * 0.2);
-    ctx.fillStyle = '#e10600';
+    ctx.translate(p.x, p.y);
+    ctx.rotate(anim * 0.35 * Math.sign(p.vx || 1));
+    ctx.fillStyle = '#6b3a22';
     ctx.beginPath();
-    ctx.arc(0, -28, 16, 0, Math.PI * 2);
+    ctx.ellipse(0, 1, 10, 4.5, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ffd24a';
-    ctx.fillRect(-10, -44, 20, 8);
+    ctx.fillStyle = '#c46a4a';
     ctx.beginPath();
-    ctx.arc(0, -48, 5, 0, Math.PI * 2);
+    ctx.ellipse(-3, -2, 4.2, 3.2, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(e.face * 6, -30, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#111';
-    ctx.beginPath();
-    ctx.arc(e.face * 7, -30, 1.7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffd24a';
-    ctx.fillRect(e.face * 10, -26, e.face * 14, 6);
-    ctx.fillStyle = '#222';
-    ctx.fillRect(-10, -10, 8, 8);
-    ctx.fillRect(4, -10, 8, 8);
     ctx.restore();
   }
 
@@ -1584,7 +1724,7 @@
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.font = '800 28px Trebuchet MS, Verdana, sans-serif';
-    ctx.fillText('KERSTHEUVEL ZONE', VIEW_W / 2, 120);
+    ctx.fillText('CHRISTMAS HILL ZONE', VIEW_W / 2, 120);
     ctx.restore();
   }
 
@@ -1611,15 +1751,8 @@
     presents.forEach(drawPresent);
     rings.forEach((r, i) => drawRingAt(r.x, r.y, anim * 0.12 + i, 1));
     loose.forEach((r) => drawRingAt(r.x, r.y, anim * 0.2, 1));
-    enemies.forEach((e) => (e.kind === 'bug' ? drawBug(e) : drawBomber(e)));
-    for (const p of projectiles) {
-      ctx.fillStyle = '#c1121f';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffd24a';
-      ctx.fillRect(p.x - 3, p.y - 10, 6, 5);
-    }
+    enemies.forEach(drawBabushka);
+    projectiles.forEach(drawSlipper);
     drawGoal();
     for (const s of sparks) {
       ctx.globalAlpha = Math.max(0, s.life / 20);
@@ -1665,29 +1798,42 @@
       acc -= 1000 / 60;
     }
     loop.acc = acc;
+    scheduleMusic();
     render();
     requestAnimationFrame(loop);
+  }
+
+  function phoneLayout() {
+    return window.matchMedia('(pointer: coarse)').matches
+      || window.matchMedia('(max-width: 820px)').matches;
+  }
+
+  function helpText() {
+    return phoneLayout()
+      ? 'Use the buttons to run and jump · 3 lives'
+      : 'Arrows or A/D to run · Space or W to jump · 3 lives';
   }
 
   function showScreen(mode) {
     cardEl.className = 'mode-' + mode;
     helpEl.hidden = mode !== 'title';
     eyebrowEl.hidden = mode !== 'title';
+    winLine.hidden = mode !== 'won';
     if (mode === 'title') {
       hMain.textContent = 'SONIC';
-      hSub.textContent = 'KERST';
-      ledeEl.textContent = 'Pak ringen — die vangen een klap op — en haal de finish.';
+      hSub.textContent = 'CHRISTMAS';
+      ledeEl.textContent = 'Collect the rings — they absorb a hit — and reach the finish.';
+      helpEl.textContent = helpText();
       playBtn.textContent = 'Start';
     } else if (mode === 'won') {
-      hMain.textContent = 'ZONE';
-      hSub.textContent = 'CLEAR';
-      ledeEl.textContent = 'Score ' + pad(player.score, 6) + '  ·  ' + player.rings + ' ringen';
-      playBtn.textContent = 'Opnieuw';
+      winLine.textContent = WIN_TEXT;
+      ledeEl.textContent = 'Score ' + pad(player.score, 6);
+      playBtn.textContent = 'Play again';
     } else {
       hMain.textContent = 'GAME';
       hSub.textContent = 'OVER';
-      ledeEl.textContent = 'Score ' + pad(player.score, 6) + '. De ringen waren op.';
-      playBtn.textContent = 'Opnieuw';
+      ledeEl.textContent = 'Score ' + pad(player.score, 6) + '. The rings ran out.';
+      playBtn.textContent = 'Play again';
     }
     screenEl.hidden = false;
     playBtn.focus();
@@ -1695,6 +1841,7 @@
 
   function startGame() {
     ensureAudio();
+    startMusic();
     buildWorld();
     resetPlayer(true);
     snapCam();
@@ -1708,6 +1855,38 @@
   }
 
   playBtn.addEventListener('click', startGame);
+
+  function bindTouch(btn, code, jump) {
+    const press = (e) => {
+      e.preventDefault();
+      btn.setPointerCapture(e.pointerId);
+      held.add(code);
+      if (jump) wantJump = true;
+      ensureAudio();
+    };
+    const release = (e) => {
+      held.delete(code);
+      if (btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
+    };
+    btn.addEventListener('pointerdown', press);
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  bindTouch(document.getElementById('btn-left'), 'ArrowLeft', false);
+  bindTouch(document.getElementById('btn-right'), 'ArrowRight', false);
+  bindTouch(document.getElementById('btn-jump'), 'Space', true);
+
+  function syncTouch() {
+    document.body.classList.toggle('show-touch', phoneLayout());
+    if (state === 'title') helpEl.textContent = helpText();
+  }
+  syncTouch();
+  window.addEventListener('resize', syncTouch);
+  document.addEventListener('touchmove', (e) => {
+    if (e.target.closest && e.target.closest('#app')) e.preventDefault();
+  }, { passive: false });
 
   buildWorld();
   resetPlayer(true);
