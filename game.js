@@ -141,7 +141,7 @@
   const cam = { x: 0, y: 0, shake: 0 };
   const player = {
     x: 200, y: 460, vx: 0, vy: 0, facing: 1,
-    onGround: true, jumping: false, ride: null,
+    onGround: true, jumping: false, rolling: false, ride: null,
     coyote: 0, buffer: 0, cutLock: 0,
     lives: 3, rings: 0, score: 0, invuln: 0,
     runFrame: 0, spin: 0, wading: false,
@@ -480,6 +480,7 @@
     player.facing = 1;
     player.onGround = true;
     player.jumping = false;
+    player.rolling = false;
     player.ride = null;
     player.coyote = 0;
     player.buffer = 0;
@@ -616,6 +617,7 @@
     }
     if (name === 'spring') tone(420, now, 0.12, 'square', 0.05);
     if (name === 'stomp') tone(180, now, 0.08, 'square', 0.05);
+    if (name === 'roll') tone(240, now, 0.07, 'square', 0.035);
     if (name === 'present') [523, 659, 784].forEach((f, i) => tone(f, now + i * 0.06, 0.1, 'square', 0.04));
     if (name === 'check') tone(660, now, 0.1, 'square', 0.04);
     if (name === 'win') [523, 659, 784, 1046].forEach((f, i) => tone(f, now + i * 0.12, 0.18, 'square', 0.05));
@@ -670,10 +672,26 @@
     return held.has('Space') || held.has('KeyW');
   }
 
+  function downHeld() {
+    return held.has('ArrowDown') || held.has('KeyS');
+  }
+
+  function beginRoll() {
+    const steer = facingDir();
+    const dir = steer !== 0
+      ? steer
+      : (Math.abs(player.vx) > 0.5 ? Math.sign(player.vx) : (player.facing || 1));
+    player.facing = dir;
+    player.rolling = true;
+    if (!player.wading && Math.abs(player.vx) < 4.2) player.vx = dir * 4.2;
+    sfx('roll');
+  }
+
   function doJump() {
     player.vy = -JUMP;
     player.onGround = false;
     player.jumping = true;
+    player.rolling = false;
     player.ride = null;
     player.coyote = 0;
     player.buffer = 0;
@@ -712,7 +730,24 @@
 
       const dir = facingDir();
       const slope = wasGround && !player.ride ? slopeAt(player.x) : 0;
-      if (wasGround) {
+      if (player.rolling && dir !== 0 && dir !== player.facing && !downHeld()) player.rolling = false;
+      if (wasGround && player.onGround && downHeld() && !player.rolling) beginRoll();
+
+      if (wasGround && player.rolling) {
+        const rollDir = player.facing || 1;
+        if (downHeld()) {
+          const steer = facingDir();
+          if (steer !== 0) player.facing = steer;
+          const dirNow = player.facing || rollDir;
+          if (player.vx !== 0 && Math.sign(player.vx) !== dirNow) player.vx = dirNow * 4.2;
+          else player.vx += dirNow * 0.2;
+        } else {
+          player.vx -= rollDir * Math.min(Math.abs(player.vx), 0.07);
+        }
+        if (!player.ride) player.vx += slope * 0.45;
+        const extra = slope * Math.sign(player.vx || 1) > 0.08 ? 2 : 0;
+        player.vx = clamp(player.vx, -(7.4 + extra), 7.4 + extra);
+      } else if (wasGround) {
         if (dir !== 0) {
           if (player.vx !== 0 && Math.sign(player.vx) !== dir) player.vx += dir * DECEL;
           else player.vx += dir * ACCEL;
@@ -731,9 +766,10 @@
       if (player.cutLock > 0) player.cutLock--;
       else if (!jumpHeld() && player.vy < -3) player.vy *= 0.62;
 
-      if (dir !== 0) player.facing = dir;
+      if (dir !== 0 && !player.rolling) player.facing = dir;
     } else {
       wantJump = false;
+      player.rolling = false;
       player.vx *= 0.9;
     }
 
@@ -778,8 +814,14 @@
       player.jumping = false;
       player.ride = landed.ride;
       player.coyote = 8;
+      if (downHeld()) {
+        if (!player.rolling) beginRoll();
+      } else if (player.rolling && Math.abs(player.vx) < 2.6) {
+        player.rolling = false;
+      }
     } else {
       player.onGround = false;
+      player.rolling = false;
       player.ride = null;
       if (player.coyote > 0) player.coyote--;
     }
@@ -792,7 +834,7 @@
       player.vx = clamp(player.vx, -cap, cap);
     }
 
-    if (player.jumping) player.spin += 0.45 + Math.abs(player.vx) * 0.02;
+    if (player.jumping || player.rolling) player.spin += 0.45 + Math.abs(player.vx) * 0.02;
     else if (player.onGround && Math.abs(player.vx) > 0.4) player.runFrame += Math.abs(player.vx) * 0.18;
   }
 
@@ -804,7 +846,7 @@
   }
 
   function playerBox() {
-    const h = player.jumping ? 34 : 58;
+    const h = player.jumping || player.rolling ? 34 : 58;
     return { l: player.x - 16, r: player.x + 16, t: player.y - h, b: player.y };
   }
 
@@ -833,6 +875,7 @@
       player.vx = -player.facing * 3.4;
       player.onGround = false;
       player.jumping = true;
+      player.rolling = false;
       player.ride = null;
       cam.shake = 8;
       flash = 8;
@@ -850,6 +893,7 @@
     player.vx = -player.facing * 1.6;
     player.vy = -5;
     player.jumping = true;
+    player.rolling = false;
     player.onGround = false;
     player.ride = null;
     deadTimer = 0;
@@ -939,6 +983,21 @@
     }
   }
 
+  function squash(e, bounce) {
+    e.dead = true;
+    e.puff = 16;
+    player.score += 200;
+    popup(e.x, e.y - 60, '+200');
+    burst(e.x, e.y - 30, '#fff');
+    sfx('stomp');
+    if (bounce) {
+      player.vy = -5.6;
+      player.onGround = false;
+      player.jumping = true;
+      player.rolling = false;
+    }
+  }
+
   function collideHazards() {
     if (player.invuln > 0) return;
     const box = playerBox();
@@ -948,16 +1007,10 @@
       const hw = e.kind === 'bear' ? 40 : 20;
       const eb = { l: e.x - hw, r: e.x + hw, t: e.y - hh, b: e.y - 2 };
       if (!overlap(box, eb)) continue;
-      if (player.vy > 0.3 && player.prevY <= e.y - hh + 12) {
-        e.dead = true;
-        e.puff = 16;
-        player.vy = -5.6;
-        player.onGround = false;
-        player.jumping = true;
-        player.score += 200;
-        popup(e.x, e.y - 48, '+200');
-        burst(e.x, e.y - 20, '#fff');
-        sfx('stomp');
+      if (player.rolling) {
+        squash(e, false);
+      } else if (player.vy > 0.3 && player.prevY <= e.y - hh + 12) {
+        squash(e, true);
       } else {
         hurt();
         return;
@@ -1034,6 +1087,7 @@
         player.vy = SPRING_V;
         player.onGround = false;
         player.jumping = true;
+        player.rolling = false;
         player.ride = null;
         player.coyote = 0;
         s.cool = 14;
@@ -1050,6 +1104,7 @@
         player.vy = -5;
         player.onGround = false;
         player.jumping = true;
+        player.rolling = false;
         grantRings(8, gift.x, gift.y - 20);
         player.score += 200;
         popup(gift.x, gift.y - 46, '+1000');
@@ -2072,7 +2127,7 @@
       }
     }
 
-    if (player.jumping || state === 'dead') {
+    if (player.jumping || player.rolling || state === 'dead') {
       // Draai om het midden van de bal, niet om de voeten.
       ctx.translate(0, -24);
       ctx.rotate(player.spin);
@@ -2445,8 +2500,8 @@
 
   function helpText() {
     return phoneLayout()
-      ? 'Use the buttons to run and jump · 3 lives'
-      : 'Arrows or A/D to run · Space or W to jump · 3 lives';
+      ? 'Use the buttons to run, roll and jump · 3 lives'
+      : 'Arrows or A/D to run · Down to roll · Space or W to jump · 3 lives';
   }
 
   function showScreen(mode) {
@@ -2537,6 +2592,7 @@
 
   bindTouch(document.getElementById('btn-left'), 'ArrowLeft', false);
   bindTouch(document.getElementById('btn-right'), 'ArrowRight', false);
+  bindTouch(document.getElementById('btn-roll'), 'ArrowDown', false);
   bindTouch(document.getElementById('btn-jump'), 'Space', true);
 
   function releaseAllTouches() {

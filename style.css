@@ -177,10 +177,18 @@ body.show-touch #touch { display: flex; }
 
 body.show-touch #app:has(#screen:not([hidden])) #touch { display: none; }
 
-#touch .pad {
+#touch .pad,
+#touch .actions {
   display: flex;
   gap: 10px;
+  align-items: flex-end;
   pointer-events: none;
+}
+
+#touch #btn-roll {
+  width: 70px;
+  height: 70px;
+  font-size: 26px;
 }
 
 #touch button {
@@ -254,5 +262,6 @@ body.show-touch #app:has(#screen:not([hidden])) #touch { display: none; }
   #lede, #help { font-size: 13px; }
   #play { font-size: 18px; padding: 8px 22px; }
   #touch button { width: 64px; height: 64px; }
+  #touch #btn-roll { width: 58px; height: 58px; font-size: 22px; }
   #btn-jump { width: 76px; height: 76px; }
 }
