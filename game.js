@@ -141,7 +141,7 @@
   const cam = { x: 0, y: 0, shake: 0 };
   const player = {
     x: 200, y: 460, vx: 0, vy: 0, facing: 1,
-    onGround: true, jumping: false, rolling: false, ride: null,
+    onGround: true, jumping: false, rolling: false, rollTime: 0, ride: null,
     coyote: 0, buffer: 0, cutLock: 0,
     lives: 3, rings: 0, score: 0, invuln: 0,
     runFrame: 0, spin: 0, wading: false,
@@ -481,6 +481,8 @@
     player.onGround = true;
     player.jumping = false;
     player.rolling = false;
+    player.rollTime = 0;
+    rollArmed = true;
     player.ride = null;
     player.coyote = 0;
     player.buffer = 0;
@@ -676,6 +678,10 @@
     return held.has('ArrowDown') || held.has('KeyS');
   }
 
+  // Eén keer indrukken rolt een kort stuk. Vasthouden rolt niet eindeloos door.
+  let rollArmed = true;
+  const ROLL_FRAMES = 34;
+
   function beginRoll() {
     const steer = facingDir();
     const dir = steer !== 0
@@ -683,6 +689,8 @@
       : (Math.abs(player.vx) > 0.5 ? Math.sign(player.vx) : (player.facing || 1));
     player.facing = dir;
     player.rolling = true;
+    player.rollTime = ROLL_FRAMES;
+    rollArmed = false;
     if (!player.wading && Math.abs(player.vx) < 4.2) player.vx = dir * 4.2;
     sfx('roll');
   }
@@ -692,6 +700,7 @@
     player.onGround = false;
     player.jumping = true;
     player.rolling = false;
+    player.rollTime = 0;
     player.ride = null;
     player.coyote = 0;
     player.buffer = 0;
@@ -730,24 +739,22 @@
 
       const dir = facingDir();
       const slope = wasGround && !player.ride ? slopeAt(player.x) : 0;
-      if (player.rolling && dir !== 0 && dir !== player.facing && !downHeld()) player.rolling = false;
-      if (wasGround && player.onGround && downHeld() && !player.rolling) beginRoll();
+      if (!downHeld()) rollArmed = true;
+      if (player.rolling) {
+        player.rollTime--;
+        if (player.rollTime <= 0) player.rolling = false;
+      }
+      if (wasGround && player.onGround && !player.jumping && downHeld() && rollArmed && !player.rolling) {
+        beginRoll();
+      }
 
-      if (wasGround && player.rolling) {
-        const rollDir = player.facing || 1;
-        if (downHeld()) {
-          const steer = facingDir();
-          if (steer !== 0) player.facing = steer;
-          const dirNow = player.facing || rollDir;
-          if (player.vx !== 0 && Math.sign(player.vx) !== dirNow) player.vx = dirNow * 4.2;
-          else player.vx += dirNow * 0.2;
-        } else {
-          player.vx -= rollDir * Math.min(Math.abs(player.vx), 0.07);
-        }
+      if (wasGround && player.onGround && player.rolling) {
+        const dirNow = player.facing || 1;
+        if (Math.abs(player.vx) < 6.4) player.vx += dirNow * 0.16;
         if (!player.ride) player.vx += slope * 0.45;
         const extra = slope * Math.sign(player.vx || 1) > 0.08 ? 2 : 0;
-        player.vx = clamp(player.vx, -(7.4 + extra), 7.4 + extra);
-      } else if (wasGround) {
+        player.vx = clamp(player.vx, -(7.2 + extra), 7.2 + extra);
+      } else if (wasGround && player.onGround) {
         if (dir !== 0) {
           if (player.vx !== 0 && Math.sign(player.vx) !== dir) player.vx += dir * DECEL;
           else player.vx += dir * ACCEL;
@@ -814,11 +821,6 @@
       player.jumping = false;
       player.ride = landed.ride;
       player.coyote = 8;
-      if (downHeld()) {
-        if (!player.rolling) beginRoll();
-      } else if (player.rolling && Math.abs(player.vx) < 2.6) {
-        player.rolling = false;
-      }
     } else {
       player.onGround = false;
       player.rolling = false;
