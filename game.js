@@ -34,7 +34,7 @@
   const winLine = document.getElementById('win-line');
   const WIN_TEXT = 'Bine jucat! Ai câștigat. Româncă nebunatică ;)';
 
-  // Twee zones. Gaten tussen de grondstukken zijn afgronden.
+  // Drie zones. Gaten tussen de grondstukken zijn afgronden.
   // y groeit naar beneden. y1 is de hoogte aan de rechterkant (helling).
   const LEVELS = [
     {
@@ -86,6 +86,36 @@
       houses: [860, 2860, 5050, 7540],
       lights: [[180, 230, 980, 220, 42], [7240, 220, 8300, 210, 36]],
     },
+    {
+      name: 'CARPATHIAN FOREST',
+      act: 'ACT 3',
+      night: false,
+      forest: true,
+      width: 8800,
+      goal: 8220,
+      sign: 'ACT 3',
+      terrain: [
+        { x: 0, w: 1480, y: 460, y1: 460 },
+        { x: 1480, w: 760, y: 492, y1: 492 },
+        { x: 2240, w: 980, y: 460, y1: 420 },
+        { x: 3220, w: 860, y: 420, y1: 420 },
+        { x: 4780, w: 680, y: 508, y1: 508 },
+        { x: 5460, w: 820, y: 480, y1: 440 },
+        { x: 6280, w: 420, y: 440, y1: 440 },
+        { x: 7420, w: 1380, y: 450, y1: 450 },
+      ],
+      trees: [],
+      pines: [
+        [160, 1.05], [520, 1.2], [980, 0.9], [1320, 1.1],
+        [2500, 1], [3050, 0.85], [3900, 1.15],
+        [5600, 1.05], [6100, 0.9], [6550, 1.1],
+        [7680, 1.2], [8500, 1],
+      ],
+      snowmen: [],
+      houses: [],
+      cabins: [400, 2860, 3720, 6000, 8040],
+      lights: [],
+    },
   ];
   let levelIndex = 0;
   let TERRAIN = LEVELS[0].terrain;
@@ -114,7 +144,7 @@
     onGround: true, jumping: false, ride: null,
     coyote: 0, buffer: 0, cutLock: 0,
     lives: 3, rings: 0, score: 0, invuln: 0,
-    runFrame: 0, spin: 0,
+    runFrame: 0, spin: 0, wading: false,
   };
   let spawn = { x: 200, y: 460 };
 
@@ -126,6 +156,9 @@
   let presents = [];
   let checkpoints = [];
   let projectiles = [];
+  let rivers = [];
+  let traps = [];
+  let salmon = [];
   let sparks = [];
   let popups = [];
   let groundMesh = [];
@@ -328,6 +361,64 @@
     ];
   }
 
+  // Bergwoud: rivieren om door te waden, zalmen, beren en vallen.
+  function fillForest() {
+    platforms = [
+      makePlatform(4340, 450, 180, 18, 'x', 300, 0.012, -Math.PI / 2),
+      makePlatform(6960, 450, 200, 18, 'x', 280, 0.011, -Math.PI / 2),
+    ];
+
+    ringOnGround(280, 5, 48, 58);
+    ringLine(1560, 400, 6, 52);
+    ringOnGround(2360, 4, 44, 60);
+    ringHump(3300, 3900, 380, 70, 6);
+    ringLine(4860, 430, 5, 50);
+    ringOnGround(5600, 4, 46, 58);
+    ringLine(6800, 390, 5, 48);
+    ringOnGround(7600, 6, 46, 62);
+
+    enemies = [
+      { kind: 'walker', x: 620, y: 460, min: 380, max: 900, dir: 1, speed: 1, frame: 0, dead: false, puff: 0 },
+      { kind: 'bear', x: 1180, y: 460, min: 980, max: 1400, dir: -1, speed: 0.72, frame: 0, dead: false, puff: 0 },
+      { kind: 'thrower', x: 2580, y: 450, hop: 20, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
+      { kind: 'bear', x: 3600, y: 420, min: 3340, max: 3960, dir: 1, speed: 0.78, frame: 0, dead: false, puff: 0 },
+      { kind: 'bear', x: 6480, y: 440, min: 6340, max: 6640, dir: -1, speed: 0.7, frame: 0, dead: false, puff: 0 },
+      { kind: 'walker', x: 7900, y: 450, min: 7560, max: 8080, dir: 1, speed: 1, frame: 0, dead: false, puff: 0 },
+    ];
+
+    rivers = [
+      { x: 1480, w: 760 },
+      { x: 4780, w: 680 },
+    ];
+    salmon = [1600, 1760, 1940, 2120, 4920, 5080, 5240, 5400].map((x, i) => ({
+      x,
+      y: 0,
+      base: 0,
+      vy: 0,
+      jumping: false,
+      wait: 40 + i * 28,
+      phase: i,
+    }));
+    traps = [520, 3000, 3440, 3880, 5750, 7720].map((x) => ({ x, y: 0, cool: 0 }));
+
+    springs = [
+      { x: 4000, y: groundY(4000), anim: 0, cool: 0 },
+    ];
+
+    presents = [
+      { x: 560, y: groundY(560), opened: false },
+      { x: 3660, y: groundY(3660), opened: false },
+      { x: 6120, y: groundY(6120), opened: false },
+      { x: 8400, y: groundY(8400), opened: false },
+    ];
+
+    checkpoints = [
+      { x: 2360, lit: false },
+      { x: 5680, lit: false },
+      { x: 7580, lit: false },
+    ];
+  }
+
   function buildWorld() {
     const level = LEVELS[levelIndex];
     TERRAIN = level.terrain;
@@ -336,13 +427,27 @@
     rings = [];
     loose = [];
     projectiles = [];
+    rivers = [];
+    traps = [];
+    salmon = [];
     sparks = [];
     popups = [];
     goal.clear = false;
     goal.done = false;
 
     if (levelIndex === 0) fillHill();
-    else fillVillage();
+    else if (levelIndex === 1) fillVillage();
+    else fillForest();
+
+    for (const fish of salmon) {
+      const gy = groundY(fish.x);
+      fish.base = gy == null ? 480 : gy;
+      fish.y = fish.base;
+    }
+    for (const trap of traps) {
+      const gy = groundY(trap.x);
+      trap.y = gy == null ? 460 : gy;
+    }
 
     for (const e of enemies) {
       const gy = groundY(e.x);
@@ -382,6 +487,7 @@
     player.invuln = full ? 0 : 150;
     player.runFrame = 0;
     player.spin = 0;
+    player.wading = false;
   }
 
   function snapCam() {
@@ -678,8 +784,23 @@
       if (player.coyote > 0) player.coyote--;
     }
 
+    player.wading = false;
+    if (player.onGround && !player.ride && riverAt(player.x)) {
+      player.wading = true;
+      const cap = 2.2;
+      if (Math.abs(player.vx) > cap) player.vx *= 0.5;
+      player.vx = clamp(player.vx, -cap, cap);
+    }
+
     if (player.jumping) player.spin += 0.45 + Math.abs(player.vx) * 0.02;
     else if (player.onGround && Math.abs(player.vx) > 0.4) player.runFrame += Math.abs(player.vx) * 0.18;
+  }
+
+  function riverAt(x) {
+    for (const r of rivers) {
+      if (x >= r.x && x <= r.x + r.w) return r;
+    }
+    return null;
   }
 
   function playerBox() {
@@ -743,10 +864,11 @@
         e.puff -= 1;
         continue;
       }
-      if (e.kind === 'walker') {
+      if (e.kind === 'walker' || e.kind === 'bear') {
+        const reach = e.kind === 'bear' ? 36 : 26;
         const next = e.x + e.dir * e.speed;
         const here = groundY(next);
-        const ahead = groundY(next + e.dir * 26);
+        const ahead = groundY(next + e.dir * reach);
         const blocked = next < e.min || next > e.max || here == null || ahead == null
           || Math.abs(ahead - here) > 40;
         if (blocked) e.dir *= -1;
@@ -792,6 +914,29 @@
       const gy = groundY(p.x);
       if (p.life <= 0 || p.y > 800 || (gy != null && p.y > gy)) projectiles.splice(i, 1);
     }
+
+    for (const fish of salmon) {
+      if (!fish.jumping) {
+        fish.wait--;
+        if (fish.wait <= 0) {
+          fish.jumping = true;
+          fish.vy = -7.4;
+          fish.y = fish.base - 6;
+        }
+      } else {
+        fish.vy += 0.28;
+        fish.y += fish.vy;
+        if (fish.vy > 0 && fish.y >= fish.base - 4) {
+          fish.y = fish.base;
+          fish.vy = 0;
+          fish.jumping = false;
+          fish.wait = 78 + (fish.phase % 5) * 18;
+        }
+      }
+    }
+    for (const trap of traps) {
+      if (trap.cool > 0) trap.cool--;
+    }
   }
 
   function collideHazards() {
@@ -799,8 +944,8 @@
     const box = playerBox();
     for (const e of enemies) {
       if (e.dead) continue;
-      const hh = e.kind === 'walker' ? 72 : 74;
-      const hw = 16;
+      const hh = e.kind === 'bear' ? 50 : e.kind === 'walker' ? 72 : 74;
+      const hw = e.kind === 'bear' ? 26 : 16;
       const eb = { l: e.x - hw, r: e.x + hw, t: e.y - hh, b: e.y - 2 };
       if (!overlap(box, eb)) continue;
       if (player.vy > 0.3 && player.prevY <= e.y - hh + 12) {
@@ -822,6 +967,23 @@
       const pb = { l: p.x - 8, r: p.x + 8, t: p.y - 8, b: p.y + 8 };
       if (overlap(box, pb)) {
         p.life = 0;
+        hurt();
+        return;
+      }
+    }
+    for (const trap of traps) {
+      if (trap.cool > 0) continue;
+      const tb = { l: trap.x - 16, r: trap.x + 16, t: trap.y - 12, b: trap.y + 2 };
+      if (overlap(box, tb) && player.vy >= -0.2) {
+        trap.cool = 70;
+        hurt();
+        return;
+      }
+    }
+    for (const fish of salmon) {
+      if (!fish.jumping || fish.y > fish.base - 18) continue;
+      const fb = { l: fish.x - 16, r: fish.x + 16, t: fish.y - 8, b: fish.y + 8 };
+      if (overlap(box, fb)) {
         hurt();
         return;
       }
@@ -1010,6 +1172,17 @@
     carryPlayer();
     moveBody(true);
 
+    if (player.wading && anim % 7 === 0) {
+      sparks.push({
+        x: player.x + (hash(anim) - 0.5) * 10,
+        y: player.y - 18,
+        vx: (hash(anim + 3) - 0.5) * 1.4,
+        vy: -1.4,
+        life: 16,
+        color: 'rgba(186, 226, 255, 0.9)',
+      });
+    }
+
     if (player.onGround && Math.abs(player.vx) > 4.4 && anim % 6 === 0) {
       sparks.push({
         x: player.x - player.facing * 12,
@@ -1082,8 +1255,13 @@
 
   function drawSky() {
     const night = LEVELS[levelIndex].night;
+    const forest = LEVELS[levelIndex].forest;
     const g = ctx.createLinearGradient(0, 0, 0, VIEW_H);
-    if (night) {
+    if (forest) {
+      g.addColorStop(0, '#1a3c2c');
+      g.addColorStop(0.45, '#3e6b45');
+      g.addColorStop(1, '#d5e2c4');
+    } else if (night) {
       g.addColorStop(0, '#071428');
       g.addColorStop(0.55, '#1a3358');
       g.addColorStop(1, '#3a4d68');
@@ -1097,7 +1275,16 @@
 
     const sunX = VIEW_W - 120;
     const sunY = 86;
-    if (night) {
+    if (forest) {
+      ctx.fillStyle = 'rgba(255, 244, 210, 0.18)';
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 70, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 236, 190, 0.55)';
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 18, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (night) {
       for (let i = 0; i < 28; i++) {
         ctx.fillStyle = 'rgba(255,255,255,0.85)';
         ctx.fillRect(hash(i + 3) * VIEW_W, hash(i + 11) * 220, 2, 2);
@@ -1175,7 +1362,9 @@
   function drawHills() {
     ctx.save();
     ctx.translate(-cam.x * 0.28, -cam.y);
-    ctx.fillStyle = LEVELS[levelIndex].night ? '#243652' : '#9fc3dd';
+    const forest = LEVELS[levelIndex].forest;
+    const night = LEVELS[levelIndex].night;
+    ctx.fillStyle = forest ? '#1c4634' : night ? '#243652' : '#9fc3dd';
     ctx.beginPath();
     ctx.moveTo(-100, 800);
     for (let x = -100; x <= LEVEL_W + 100; x += 24) {
@@ -1190,7 +1379,7 @@
     ctx.translate(-cam.x * 0.5, -cam.y);
     for (let x = 40; x < LEVEL_W; x += 260) {
       const y = 360 + Math.sin(x * 0.01) * 16;
-      ctx.fillStyle = LEVELS[levelIndex].night ? '#14382c' : '#2f6d45';
+      ctx.fillStyle = LEVELS[levelIndex].forest ? '#0f3324' : LEVELS[levelIndex].night ? '#14382c' : '#2f6d45';
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + 28, y + 70);
@@ -1245,7 +1434,10 @@
         const b = poly[i + 1];
         const alt = (Math.floor(a.x / 26) + Math.floor(a.y / 26)) % 2 === 0;
         const night = LEVELS[levelIndex].night;
-        ctx.fillStyle = alt ? (night ? '#146b3a' : '#1f9a45') : (night ? '#0d4e2c' : '#157536');
+        const forest = LEVELS[levelIndex].forest;
+        ctx.fillStyle = alt
+          ? (forest ? '#2f6a32' : night ? '#146b3a' : '#1f9a45')
+          : (forest ? '#245428' : night ? '#0d4e2c' : '#157536');
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
@@ -1396,6 +1588,188 @@
     ctx.fillRect(x + 12, y - 82, 10, 18);
   }
 
+  function drawPine(x, y, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#5a3a22';
+    ctx.fillRect(-4, -18, 8, 22);
+    [0, 1, 2, 3].forEach((i) => {
+      const ly = -16 - i * 22;
+      const w = 34 - i * 6;
+      ctx.fillStyle = i % 2 ? '#0f4a28' : '#16633a';
+      ctx.beginPath();
+      ctx.moveTo(0, ly - 28);
+      ctx.lineTo(w, ly);
+      ctx.lineTo(-w, ly);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // Maramureș-huis: stenen voet, gestapelde balken, steil dak.
+  function drawCabin(x, y) {
+    ctx.fillStyle = '#8d8a84';
+    ctx.fillRect(x - 34, y - 16, 68, 16);
+    ctx.fillStyle = '#6a4328';
+    ctx.fillRect(x - 30, y - 58, 60, 44);
+    ctx.strokeStyle = '#3d2616';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x - 30, y - 50 + i * 10);
+      ctx.lineTo(x + 30, y - 50 + i * 10);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#f4efe4';
+    ctx.fillRect(x - 7, y - 28, 14, 28);
+    ctx.fillStyle = '#9fd0c8';
+    ctx.fillRect(x - 24, y - 46, 12, 10);
+    ctx.fillRect(x + 12, y - 46, 12, 10);
+    ctx.strokeStyle = '#3d2616';
+    ctx.strokeRect(x - 24, y - 46, 12, 10);
+    ctx.strokeRect(x + 12, y - 46, 12, 10);
+    ctx.fillStyle = '#4a3424';
+    ctx.beginPath();
+    ctx.moveTo(x - 40, y - 54);
+    ctx.lineTo(x, y - 108);
+    ctx.lineTo(x + 40, y - 54);
+    ctx.fill();
+    ctx.strokeStyle = '#2c1c12';
+    ctx.beginPath();
+    for (let i = 1; i <= 4; i++) {
+      const t = i / 5;
+      const yy = -54 - t * 48;
+      const half = 40 * (1 - t);
+      ctx.moveTo(x - half, y + yy);
+      ctx.lineTo(x + half, y + yy);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#5a4034';
+    ctx.fillRect(x + 10, y - 96, 8, 16);
+  }
+
+  function drawBear(e) {
+    if (e.dead && e.puff <= 0) return;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    if (e.dead) {
+      ctx.globalAlpha = Math.max(0, e.puff / 16);
+      ctx.fillStyle = '#6b3e24';
+      ctx.beginPath();
+      ctx.arc(0, -24, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+    ctx.scale(e.dir || 1, 1);
+    const step = Math.sin(e.frame * 0.35);
+    ctx.fillStyle = '#4a2c1a';
+    ctx.fillRect(-18, -8, 10, 8);
+    ctx.fillRect(6, -8 - step * 2, 10, 8);
+    ctx.fillStyle = '#7a4a2a';
+    ctx.beginPath();
+    ctx.ellipse(0, -28, 26, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8d5a34';
+    ctx.beginPath();
+    ctx.arc(16, -40, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#5c3a22';
+    ctx.beginPath();
+    ctx.arc(8, -48, 4, 0, Math.PI * 2);
+    ctx.arc(20, -50, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c48a62';
+    ctx.beginPath();
+    ctx.ellipse(24, -36, 7, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a120c';
+    ctx.beginPath();
+    ctx.arc(28, -36, 1.3, 0, Math.PI * 2);
+    ctx.arc(18, -42, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTrap(trap) {
+    const open = trap.cool <= 0;
+    ctx.save();
+    ctx.translate(trap.x, trap.y);
+    ctx.fillStyle = '#6d5a48';
+    ctx.fillRect(-14, -4, 28, 5);
+    ctx.strokeStyle = '#c5ccd4';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    if (open) {
+      ctx.arc(-2, -2, 12, Math.PI, Math.PI * 1.72);
+      ctx.moveTo(2, -2);
+      ctx.arc(2, -2, 12, Math.PI * 1.28, 0);
+    } else {
+      ctx.arc(0, -2, 10, Math.PI * 1.05, Math.PI * 1.95);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#e8eef2';
+    if (open) {
+      ctx.fillRect(-12, -14, 2, 6);
+      ctx.fillRect(10, -14, 2, 6);
+    }
+    ctx.restore();
+  }
+
+  function drawSalmon(fish) {
+    const surface = fish.base - 28;
+    if (!fish.jumping) {
+      ctx.strokeStyle = 'rgba(220, 245, 255, 0.65)';
+      ctx.beginPath();
+      ctx.ellipse(fish.x, surface, 8 + Math.sin(anim * 0.2 + fish.phase) * 2, 3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      return;
+    }
+    ctx.save();
+    ctx.translate(fish.x, fish.y);
+    ctx.rotate(fish.vy < 0 ? -1.05 : 1.05);
+    ctx.fillStyle = '#e15a32';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 13, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f3c7a4';
+    ctx.beginPath();
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(-18, -6);
+    ctx.lineTo(-18, 6);
+    ctx.fill();
+    ctx.fillStyle = '#1a120c';
+    ctx.beginPath();
+    ctx.arc(7, -1.5, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRivers(cover) {
+    for (const river of rivers) {
+      const bed = groundY(river.x + 12);
+      if (bed == null) continue;
+      const surface = bed - 28;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(river.x, surface, river.w, bed - surface + 16);
+      ctx.clip();
+      ctx.fillStyle = cover ? 'rgba(92, 168, 206, 0.38)' : 'rgba(32, 104, 156, 0.62)';
+      ctx.fillRect(river.x, surface, river.w, 80);
+      ctx.strokeStyle = 'rgba(230, 248, 255, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = river.x; x <= river.x + river.w; x += 10) {
+        const y = surface + Math.sin(x * 0.09 + anim * 0.15) * 2.2;
+        if (x === river.x) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function drawDecor() {
     const level = LEVELS[levelIndex];
     for (const [x, s] of level.trees) {
@@ -1409,6 +1783,14 @@
     for (const x of level.houses) {
       const gy = groundY(x);
       if (gy != null) drawHouse(x, gy);
+    }
+    for (const [x, s] of level.pines || []) {
+      const gy = groundY(x);
+      if (gy != null) drawPine(x, gy, s);
+    }
+    for (const x of level.cabins || []) {
+      const gy = groundY(x);
+      if (gy != null) drawCabin(x, gy);
     }
     for (const [x1, y1, x2, y2, sag] of level.lights) drawLights(x1, y1, x2, y2, sag);
 
@@ -1915,6 +2297,7 @@
     ctx.translate(-cam.x + sx, -cam.y + sy);
     drawPits();
     drawGround();
+    drawRivers(false);
     drawDecor();
     checkpoints.forEach(drawCheckpoint);
     platforms.forEach(drawPlatform);
@@ -1922,7 +2305,8 @@
     presents.forEach(drawPresent);
     rings.forEach((r, i) => drawRingAt(r.x, r.y, anim * 0.12 + i, 1));
     loose.forEach((r) => drawRingAt(r.x, r.y, anim * 0.2, 1));
-    enemies.forEach(drawBabushka);
+    traps.forEach(drawTrap);
+    enemies.forEach((e) => (e.kind === 'bear' ? drawBear(e) : drawBabushka(e)));
     projectiles.forEach(drawSlipper);
     drawGoal();
     for (const s of sparks) {
@@ -1934,6 +2318,8 @@
       ctx.globalAlpha = 1;
     }
     drawSonic();
+    drawRivers(true);
+    salmon.forEach(drawSalmon);
     ctx.fillStyle = '#fff';
     ctx.font = '800 14px Trebuchet MS, Verdana, sans-serif';
     ctx.textAlign = 'center';
@@ -1993,7 +2379,7 @@
     if (mode === 'title') {
       hMain.textContent = 'SONIC';
       hSub.textContent = 'CHRISTMAS';
-      ledeEl.textContent = 'Two zones. Collect the rings — they absorb a hit — and clear both finishes.';
+      ledeEl.textContent = 'Three zones. Collect the rings — they absorb a hit — and clear every finish.';
       helpEl.textContent = helpText();
       playBtn.textContent = 'Start';
     } else if (mode === 'won') {
