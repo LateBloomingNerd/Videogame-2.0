@@ -390,7 +390,7 @@
       { x: 1480, w: 760 },
       { x: 4780, w: 680 },
     ];
-    salmon = [1600, 1760, 1940, 2120, 4920, 5080, 5240, 5400].map((x, i) => ({
+    salmon = [1680, 2040, 4960, 5280].map((x, i) => ({
       x,
       y: 0,
       base: 0,
@@ -865,7 +865,7 @@
         continue;
       }
       if (e.kind === 'walker' || e.kind === 'bear') {
-        const reach = e.kind === 'bear' ? 36 : 26;
+        const reach = e.kind === 'bear' ? 48 : 26;
         const next = e.x + e.dir * e.speed;
         const here = groundY(next);
         const ahead = groundY(next + e.dir * reach);
@@ -880,14 +880,14 @@
       } else {
         e.hop++;
         e.face = Math.sign(player.x - e.x) || e.face;
-        if (e.onGround && e.hop > 108) {
+        if (e.onGround && e.hop > 250) {
           e.vy = -6.3;
           e.onGround = false;
           e.hop = 0;
           if (Math.abs(player.x - e.x) < 500) {
             projectiles.push({
-              x: e.x + e.face * 18,
-              y: e.y - 38,
+              x: e.x + e.face * 22,
+              y: e.y - 50,
               vx: e.face * 3.35,
               vy: -1.15,
               life: 150,
@@ -944,8 +944,8 @@
     const box = playerBox();
     for (const e of enemies) {
       if (e.dead) continue;
-      const hh = e.kind === 'bear' ? 50 : e.kind === 'walker' ? 72 : 74;
-      const hw = e.kind === 'bear' ? 26 : 16;
+      const hh = e.kind === 'bear' ? 90 : e.kind === 'walker' ? 90 : 92;
+      const hw = e.kind === 'bear' ? 40 : 20;
       const eb = { l: e.x - hw, r: e.x + hw, t: e.y - hh, b: e.y - 2 };
       if (!overlap(box, eb)) continue;
       if (player.vy > 0.3 && player.prevY <= e.y - hh + 12) {
@@ -1655,40 +1655,105 @@
     ctx.translate(e.x, e.y);
     if (e.dead) {
       ctx.globalAlpha = Math.max(0, e.puff / 16);
-      ctx.fillStyle = '#6b3e24';
+      ctx.fillStyle = '#4a2414';
       ctx.beginPath();
-      ctx.arc(0, -24, 18, 0, Math.PI * 2);
+      ctx.arc(0, -36, 28, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
       return;
     }
     ctx.scale(e.dir || 1, 1);
     const step = Math.sin(e.frame * 0.35);
-    ctx.fillStyle = '#4a2c1a';
-    ctx.fillRect(-18, -8, 10, 8);
-    ctx.fillRect(6, -8 - step * 2, 10, 8);
-    ctx.fillStyle = '#7a4a2a';
+
+    ctx.fillStyle = '#2c180e';
+    ctx.fillRect(-34, -16, 16, 16);
+    ctx.fillRect(4, -16 - step * 2, 16, 16);
+    ctx.fillStyle = '#f4f0e6';
+    ctx.fillRect(-32, -4, 3, 6);
+    ctx.fillRect(-26, -4, 3, 6);
+    ctx.fillRect(8, -4 - step * 2, 3, 6);
+    ctx.fillRect(14, -4 - step * 2, 3, 6);
+
+    ctx.fillStyle = '#5c3218';
     ctx.beginPath();
-    ctx.ellipse(0, -28, 26, 16, 0, 0, Math.PI * 2);
+    ctx.ellipse(-2, -44, 38, 24, -0.12, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#8d5a34';
+    ctx.fillStyle = '#3d2412';
     ctx.beginPath();
-    ctx.arc(16, -40, 11, 0, Math.PI * 2);
+    ctx.ellipse(8, -58, 20, 13, -0.35, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#5c3a22';
+
+    ctx.fillStyle = '#6b3d22';
     ctx.beginPath();
-    ctx.arc(8, -48, 4, 0, Math.PI * 2);
-    ctx.arc(20, -50, 4, 0, Math.PI * 2);
+    ctx.ellipse(16, -72 + step * 2, 11, 16, 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f4f0e6';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(18 + i * 5, -82 + step * 2);
+      ctx.lineTo(21 + i * 5, -94 + step * 2);
+      ctx.lineTo(24 + i * 5, -82 + step * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = '#7a4a2c';
+    ctx.beginPath();
+    ctx.arc(32, -64, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2c180e';
+    ctx.beginPath();
+    ctx.arc(22, -80, 7, 0, Math.PI * 2);
+    ctx.arc(40, -82, 7, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#c48a62';
     ctx.beginPath();
-    ctx.ellipse(24, -36, 7, 5, 0, 0, Math.PI * 2);
+    ctx.arc(22, -80, 3.4, 0, Math.PI * 2);
+    ctx.arc(40, -82, 3.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#e0b08a';
+    ctx.beginPath();
+    ctx.ellipse(46, -58, 12, 8, 0.15, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#1a120c';
     ctx.beginPath();
-    ctx.arc(28, -36, 1.3, 0, Math.PI * 2);
-    ctx.arc(18, -42, 1.3, 0, Math.PI * 2);
+    ctx.ellipse(54, -60, 4.2, 3, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.fillStyle = '#7a1424';
+    ctx.beginPath();
+    ctx.ellipse(46, -50, 9, 6, 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fffaf2';
+    ctx.beginPath();
+    ctx.moveTo(39, -54);
+    ctx.lineTo(41, -46);
+    ctx.lineTo(44, -54);
+    ctx.lineTo(47, -45);
+    ctx.lineTo(50, -54);
+    ctx.lineTo(53, -46);
+    ctx.lineTo(55, -54);
+    ctx.fill();
+
+    ctx.fillStyle = '#f2d15a';
+    ctx.beginPath();
+    ctx.ellipse(38, -68, 4.4, 3.2, -0.2, 0, Math.PI * 2);
+    ctx.ellipse(28, -70, 3.5, 2.6, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8d1208';
+    ctx.beginPath();
+    ctx.arc(39.2, -68, 1.8, 0, Math.PI * 2);
+    ctx.arc(29, -70, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1a120c';
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(32, -74);
+    ctx.lineTo(43, -71);
+    ctx.moveTo(23, -75);
+    ctx.lineTo(32, -73);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -2099,11 +2164,12 @@
   }
 
   // Boze oude baboesjka: hoofddoek, schort en een diepe frons.
-  // De springer zwaait met een deegroller en gooit een pantoffel.
+  // De springer zwaait met een deegroller en gooit af en toe een pantoffel.
   function drawBabushka(e) {
     if (e.dead && e.puff <= 0) return;
     ctx.save();
     ctx.translate(e.x, e.y);
+    ctx.scale(1.24, 1.24);
     if (e.dead) {
       ctx.globalAlpha = Math.max(0, e.puff / 16);
       ctx.fillStyle = '#9d1c34';
@@ -2205,16 +2271,28 @@
     ctx.arc(11.2, -52, 1.5, 0, Math.PI * 2);
     ctx.fill();
 
+    ctx.strokeStyle = '#4a1020';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(2, -60);
+    ctx.lineTo(8, -56);
+    ctx.moveTo(8, -62);
+    ctx.lineTo(14, -56);
+    ctx.stroke();
     ctx.strokeStyle = '#6d2030';
     ctx.lineWidth = 2.4;
-    ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.arc(9, -45, 4.6, 0.15 * Math.PI, 0.85 * Math.PI);
     ctx.stroke();
+    ctx.fillStyle = '#fffaf2';
+    ctx.fillRect(6.2, -45, 2, 3.4);
+    ctx.fillRect(9.2, -45.4, 2, 3.6);
+    ctx.fillRect(12.2, -45, 2, 3.4);
 
-    ctx.fillStyle = 'rgba(186, 42, 42, 0.8)';
+    ctx.fillStyle = 'rgba(186, 42, 42, 0.9)';
     ctx.beginPath();
-    ctx.arc(15, -49, 2.6, 0, Math.PI * 2);
+    ctx.arc(15, -49, 3.1, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
