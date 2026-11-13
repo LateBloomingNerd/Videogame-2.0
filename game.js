@@ -34,19 +34,63 @@
   const winLine = document.getElementById('win-line');
   const WIN_TEXT = 'Bine jucat! Ai câștigat. Româncă nebunatică ;)';
 
-  // Vaste grond. Gaten tussen de stukken zijn afgronden.
+  // Twee zones. Gaten tussen de grondstukken zijn afgronden.
   // y groeit naar beneden. y1 is de hoogte aan de rechterkant (helling).
-  const TERRAIN = [
-    { x: 0, w: 2500, y: 460, y1: 460 },
-    { x: 3080, w: 1400, y: 460, y1: 460 },
-    { x: 4480, w: 420, y: 460, y1: 530 },
-    { x: 5090, w: 750, y: 530, y1: 530 },
-    { x: 5840, w: 460, y: 530, y1: 460 },
-    { x: 6300, w: 360, y: 460, y1: 460 },
-    { x: 7600, w: 1500, y: 460, y1: 460 },
+  const LEVELS = [
+    {
+      name: 'CHRISTMAS HILL ZONE',
+      act: 'ACT 1',
+      night: false,
+      width: 9100,
+      goal: 8520,
+      sign: 'START',
+      terrain: [
+        { x: 0, w: 2500, y: 460, y1: 460 },
+        { x: 3080, w: 1400, y: 460, y1: 460 },
+        { x: 4480, w: 420, y: 460, y1: 530 },
+        { x: 5090, w: 750, y: 530, y1: 530 },
+        { x: 5840, w: 460, y: 530, y1: 460 },
+        { x: 6300, w: 360, y: 460, y1: 460 },
+        { x: 7600, w: 1500, y: 460, y1: 460 },
+      ],
+      trees: [
+        [90, 1.05], [430, 0.85], [760, 0.7], [1280, 1], [2100, 0.9],
+        [3300, 1.1], [3920, 0.8], [4700, 0.85], [5600, 0.95],
+        [6420, 0.8], [7900, 1], [8680, 1.15],
+      ],
+      snowmen: [520, 4550, 8040],
+      houses: [],
+      lights: [[180, 250, 860, 250, 46], [7900, 240, 8600, 230, 40]],
+    },
+    {
+      name: 'BUNICA VILLAGE ZONE',
+      act: 'ACT 2',
+      night: true,
+      width: 8600,
+      goal: 8020,
+      sign: 'ACT 2',
+      terrain: [
+        { x: 0, w: 1700, y: 460, y1: 460 },
+        { x: 2360, w: 740, y: 460, y1: 400 },
+        { x: 3100, w: 800, y: 400, y1: 400 },
+        { x: 4550, w: 750, y: 510, y1: 530 },
+        { x: 5300, w: 700, y: 530, y1: 450 },
+        { x: 6000, w: 360, y: 450, y1: 450 },
+        { x: 7100, w: 1500, y: 450, y1: 450 },
+      ],
+      trees: [
+        [240, 0.9], [1180, 1], [2680, 0.8], [3600, 0.85],
+        [4900, 0.9], [5750, 0.75], [7480, 1], [8380, 1.1],
+      ],
+      snowmen: [430, 7680],
+      houses: [860, 2860, 5050, 7540],
+      lights: [[180, 230, 980, 220, 42], [7240, 220, 8300, 210, 36]],
+    },
   ];
-  const LEVEL_W = 9100;
-  const GOAL_X = 8520;
+  let levelIndex = 0;
+  let TERRAIN = LEVELS[0].terrain;
+  let LEVEL_W = LEVELS[0].width;
+  let GOAL_X = LEVELS[0].goal;
 
   const held = new Set();
   let wantJump = false;
@@ -175,16 +219,7 @@
     }
   }
 
-  // Het level: intro, brug, schutter, afdaling, grote afgrond, finish.
-  function buildWorld() {
-    rings = [];
-    loose = [];
-    projectiles = [];
-    sparks = [];
-    popups = [];
-    goal.clear = false;
-    goal.done = false;
-
+  function fillHill() {
     platforms = [
       makePlatform(780, 390, 110, 16, 'x', 55, 0.03, 0),
       makePlatform(1500, 370, 120, 16, 'none', 0, 0, 0),
@@ -222,10 +257,6 @@
       { kind: 'thrower', x: 3400, y: 460, hop: 0, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
       { kind: 'thrower', x: 7780, y: 460, hop: 30, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
     ];
-    for (const e of enemies) {
-      const gy = groundY(e.x);
-      if (gy != null) e.y = gy;
-    }
 
     springs = [
       { x: 1020, y: groundY(1020), anim: 0, cool: 0 },
@@ -244,6 +275,79 @@
       { x: 5980, lit: false },
       { x: 6500, lit: false },
     ];
+  }
+
+  // Nachtelijk dorp: daken, een dal en een laatste plein.
+  function fillVillage() {
+    platforms = [
+      makePlatform(1940, 460, 170, 18, 'x', 280, 0.014, -Math.PI / 2),
+      makePlatform(3980, 340, 120, 16, 'none', 0, 0, 0),
+      makePlatform(4180, 280, 120, 16, 'none', 0, 0, 0),
+      makePlatform(4400, 340, 130, 16, 'none', 0, 0, 0),
+      makePlatform(6520, 450, 160, 18, 'x', 200, 0.013, -Math.PI / 2),
+      makePlatform(6920, 430, 190, 16, 'y', 36, 0.02, 0),
+    ];
+
+    ringOnGround(300, 6, 46, 58);
+    ringLine(1680, 400, 7, 48);
+    ringHump(2500, 3000, 420, 80, 6);
+    ringLine(4020, 300, 3, 28);
+    ringLine(4220, 240, 3, 28);
+    ringLine(4440, 300, 3, 30);
+    ringOnGround(4680, 5, 44, 60);
+    ringHump(5450, 5900, 500, 90, 6);
+    ringLine(6460, 390, 6, 46);
+    ringOnGround(7300, 7, 48, 62);
+    ringHump(7760, 7960, 390, 70, 5);
+
+    enemies = [
+      { kind: 'walker', x: 1100, y: 460, min: 640, max: 1500, dir: 1, speed: 1.05, frame: 0, dead: false, puff: 0 },
+      { kind: 'thrower', x: 2740, y: 460, hop: 10, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
+      { kind: 'thrower', x: 3480, y: 400, hop: 40, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
+      { kind: 'walker', x: 4900, y: 520, min: 4680, max: 5160, dir: -1, speed: 1.1, frame: 0, dead: false, puff: 0 },
+      { kind: 'thrower', x: 6160, y: 450, hop: 20, vy: 0, onGround: true, face: -1, dead: false, puff: 0 },
+      { kind: 'walker', x: 7480, y: 450, min: 7280, max: 7760, dir: 1, speed: 1.05, frame: 0, dead: false, puff: 0 },
+    ];
+
+    springs = [
+      { x: 3000, y: groundY(3000), anim: 0, cool: 0 },
+      { x: 6200, y: groundY(6200), anim: 0, cool: 0 },
+    ];
+
+    presents = [
+      { x: 520, y: groundY(520), opened: false },
+      { x: 4220, y: 280, opened: false },
+      { x: 5080, y: groundY(5080), opened: false },
+      { x: 8240, y: groundY(8240), opened: false },
+    ];
+
+    checkpoints = [
+      { x: 2600, lit: false },
+      { x: 5000, lit: false },
+      { x: 7300, lit: false },
+    ];
+  }
+
+  function buildWorld() {
+    const level = LEVELS[levelIndex];
+    TERRAIN = level.terrain;
+    LEVEL_W = level.width;
+    GOAL_X = level.goal;
+    rings = [];
+    loose = [];
+    projectiles = [];
+    sparks = [];
+    popups = [];
+    goal.clear = false;
+    goal.done = false;
+
+    if (levelIndex === 0) fillHill();
+    else fillVillage();
+
+    for (const e of enemies) {
+      const gy = groundY(e.x);
+      if (gy != null) e.y = gy;
+    }
 
     groundMesh = [];
     let cur = [];
@@ -875,10 +979,28 @@
     updateCamera();
     if (clearTimer > 105 && !goal.done) {
       goal.done = true;
-      player.score += player.lives * 1000;
-      state = 'won';
-      sfx('win');
-      showScreen('won');
+      if (levelIndex < LEVELS.length - 1) {
+        const lives = player.lives;
+        const ringsHeld = player.rings;
+        player.score += 1000;
+        const score = player.score;
+        levelIndex += 1;
+        buildWorld();
+        spawn = { x: 180, y: groundY(180) };
+        resetPlayer(false);
+        player.lives = lives;
+        player.rings = ringsHeld;
+        player.score = score;
+        snapCam();
+        zoneTimer = 160;
+        state = 'play';
+        sfx('win');
+      } else {
+        player.score += player.lives * 1000;
+        state = 'won';
+        sfx('win');
+        showScreen('won');
+      }
     }
   }
 
@@ -959,26 +1081,48 @@
   }
 
   function drawSky() {
+    const night = LEVELS[levelIndex].night;
     const g = ctx.createLinearGradient(0, 0, 0, VIEW_H);
-    g.addColorStop(0, '#6eb7f6');
-    g.addColorStop(0.55, '#d7f0ff');
-    g.addColorStop(1, '#fff4dd');
+    if (night) {
+      g.addColorStop(0, '#071428');
+      g.addColorStop(0.55, '#1a3358');
+      g.addColorStop(1, '#3a4d68');
+    } else {
+      g.addColorStop(0, '#6eb7f6');
+      g.addColorStop(0.55, '#d7f0ff');
+      g.addColorStop(1, '#fff4dd');
+    }
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
     const sunX = VIEW_W - 120;
     const sunY = 86;
-    const glow = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 90);
-    glow.addColorStop(0, 'rgba(255, 236, 170, 0.95)');
-    glow.addColorStop(1, 'rgba(255, 236, 170, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 90, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffe7a2';
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 28, 0, Math.PI * 2);
-    ctx.fill();
+    if (night) {
+      for (let i = 0; i < 28; i++) {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillRect(hash(i + 3) * VIEW_W, hash(i + 11) * 220, 2, 2);
+      }
+      ctx.fillStyle = '#f4f7ff';
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1a3358';
+      ctx.beginPath();
+      ctx.arc(sunX + 8, sunY - 4, 18, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const glow = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 90);
+      glow.addColorStop(0, 'rgba(255, 236, 170, 0.95)');
+      glow.addColorStop(1, 'rgba(255, 236, 170, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 90, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffe7a2';
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 28, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     drawSleigh();
   }
@@ -1031,7 +1175,7 @@
   function drawHills() {
     ctx.save();
     ctx.translate(-cam.x * 0.28, -cam.y);
-    ctx.fillStyle = '#9fc3dd';
+    ctx.fillStyle = LEVELS[levelIndex].night ? '#243652' : '#9fc3dd';
     ctx.beginPath();
     ctx.moveTo(-100, 800);
     for (let x = -100; x <= LEVEL_W + 100; x += 24) {
@@ -1046,7 +1190,7 @@
     ctx.translate(-cam.x * 0.5, -cam.y);
     for (let x = 40; x < LEVEL_W; x += 260) {
       const y = 360 + Math.sin(x * 0.01) * 16;
-      ctx.fillStyle = '#2f6d45';
+      ctx.fillStyle = LEVELS[levelIndex].night ? '#14382c' : '#2f6d45';
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + 28, y + 70);
@@ -1100,7 +1244,8 @@
         const a = poly[i];
         const b = poly[i + 1];
         const alt = (Math.floor(a.x / 26) + Math.floor(a.y / 26)) % 2 === 0;
-        ctx.fillStyle = alt ? '#1f9a45' : '#157536';
+        const night = LEVELS[levelIndex].night;
+        ctx.fillStyle = alt ? (night ? '#146b3a' : '#1f9a45') : (night ? '#0d4e2c' : '#157536');
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
@@ -1227,22 +1372,45 @@
     }
   }
 
+  function drawHouse(x, y) {
+    ctx.fillStyle = '#6d3038';
+    ctx.fillRect(x - 28, y - 52, 56, 52);
+    ctx.fillStyle = '#f6f1e6';
+    ctx.fillRect(x - 8, y - 26, 16, 26);
+    ctx.fillStyle = '#9fd7ff';
+    ctx.fillRect(x - 22, y - 42, 12, 10);
+    ctx.fillRect(x + 10, y - 42, 12, 10);
+    ctx.fillStyle = '#7a3038';
+    ctx.beginPath();
+    ctx.moveTo(x - 36, y - 48);
+    ctx.lineTo(x, y - 84);
+    ctx.lineTo(x + 36, y - 48);
+    ctx.fill();
+    ctx.fillStyle = '#f7fbff';
+    ctx.beginPath();
+    ctx.moveTo(x - 18, y - 60);
+    ctx.lineTo(x, y - 84);
+    ctx.lineTo(x + 18, y - 60);
+    ctx.fill();
+    ctx.fillStyle = '#5a4034';
+    ctx.fillRect(x + 12, y - 82, 10, 18);
+  }
+
   function drawDecor() {
-    const trees = [
-      [90, 1.05], [430, 0.85], [760, 0.7], [1280, 1], [2100, 0.9],
-      [3300, 1.1], [3920, 0.8], [4700, 0.85], [5600, 0.95],
-      [6420, 0.8], [7900, 1], [8680, 1.15],
-    ];
-    for (const [x, s] of trees) {
+    const level = LEVELS[levelIndex];
+    for (const [x, s] of level.trees) {
       const gy = groundY(x);
       if (gy != null) drawTree(x, gy, s);
     }
-    [520, 4550, 8040].forEach((x) => {
+    for (const x of level.snowmen) {
       const gy = groundY(x);
       if (gy != null) drawSnowman(x, gy);
-    });
-    drawLights(180, 250, 860, 250, 46);
-    drawLights(7900, 240, 8600, 230, 40);
+    }
+    for (const x of level.houses) {
+      const gy = groundY(x);
+      if (gy != null) drawHouse(x, gy);
+    }
+    for (const [x1, y1, x2, y2, sag] of level.lights) drawLights(x1, y1, x2, y2, sag);
 
     // Zuurtjesstokken langs de randen van elke afgrond.
     for (let i = 0; i < TERRAIN.length - 1; i++) {
@@ -1264,7 +1432,7 @@
     ctx.fillStyle = '#fff';
     ctx.font = '800 14px Trebuchet MS, Verdana, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('START', 149, gy - 58);
+    ctx.fillText(LEVELS[levelIndex].sign, 149, gy - 58);
   }
 
   function drawPlatform(p) {
@@ -1382,7 +1550,7 @@
     ctx.fillStyle = '#fff';
     ctx.font = '800 16px Trebuchet MS, Verdana, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('FINISH', GOAL_X + 32, gy - 112);
+    ctx.fillText(levelIndex < LEVELS.length - 1 ? 'NEXT' : 'FINISH', GOAL_X + 32, gy - 112);
     ctx.save();
     ctx.translate(GOAL_X + 32, gy - 162);
     if (goal.clear) ctx.rotate(anim * 0.18);
@@ -1686,7 +1854,7 @@
 
   function drawHud() {
     ctx.fillStyle = 'rgba(8, 18, 36, 0.55)';
-    roundRect(12, 12, 430, 36, 10);
+    roundRect(12, 12, 470, 36, 10);
     ctx.fill();
     ctx.font = '800 16px Trebuchet MS, Verdana, sans-serif';
     ctx.textAlign = 'left';
@@ -1711,6 +1879,9 @@
       ctx.lineTo(x + 6, 22);
       ctx.fill();
     }
+    ctx.fillStyle = '#ffe7a8';
+    ctx.textAlign = 'right';
+    ctx.fillText(LEVELS[levelIndex].act, 470, 35);
   }
 
   function drawZoneCard() {
@@ -1724,7 +1895,7 @@
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.font = '800 28px Trebuchet MS, Verdana, sans-serif';
-    ctx.fillText('CHRISTMAS HILL ZONE', VIEW_W / 2, 120);
+    ctx.fillText(LEVELS[levelIndex].name, VIEW_W / 2, 120);
     ctx.restore();
   }
 
@@ -1822,7 +1993,7 @@
     if (mode === 'title') {
       hMain.textContent = 'SONIC';
       hSub.textContent = 'CHRISTMAS';
-      ledeEl.textContent = 'Collect the rings — they absorb a hit — and reach the finish.';
+      ledeEl.textContent = 'Two zones. Collect the rings — they absorb a hit — and clear both finishes.';
       helpEl.textContent = helpText();
       playBtn.textContent = 'Start';
     } else if (mode === 'won') {
@@ -1842,6 +2013,7 @@
   function startGame() {
     ensureAudio();
     startMusic();
+    levelIndex = 0;
     buildWorld();
     resetPlayer(true);
     snapCam();
