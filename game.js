@@ -2414,27 +2414,61 @@
 
   playBtn.addEventListener('click', startGame);
 
+  // Telefoons laten een knop na het loslaten "geselecteerd". Daarom geen focus
+  // of pointer-capture, en loslaten via het hele scherm zodra de vinger weg is.
+  const touchControls = new Map();
+
+  function releaseTouch(code) {
+    const info = touchControls.get(code);
+    if (!info || !info.down) return;
+    info.pointers.clear();
+    info.down = false;
+    info.btn.classList.remove('is-down');
+    held.delete(code);
+    if (document.activeElement === info.btn) info.btn.blur();
+  }
+
   function bindTouch(btn, code, jump) {
+    const info = { btn, pointers: new Set(), down: false };
+    touchControls.set(code, info);
+
     const press = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
-      btn.setPointerCapture(e.pointerId);
+      info.pointers.add(e.pointerId);
+      info.down = true;
       held.add(code);
+      btn.classList.add('is-down');
       if (jump) wantJump = true;
       ensureAudio();
     };
-    const release = (e) => {
-      held.delete(code);
-      if (btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
+    const unpress = (e) => {
+      if (!info.pointers.has(e.pointerId)) return;
+      info.pointers.delete(e.pointerId);
+      if (info.pointers.size === 0) releaseTouch(code);
     };
+
     btn.addEventListener('pointerdown', press);
-    btn.addEventListener('pointerup', release);
-    btn.addEventListener('pointercancel', release);
+    window.addEventListener('pointerup', unpress);
+    window.addEventListener('pointercancel', unpress);
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    btn.addEventListener('focus', () => btn.blur());
     btn.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   bindTouch(document.getElementById('btn-left'), 'ArrowLeft', false);
   bindTouch(document.getElementById('btn-right'), 'ArrowRight', false);
   bindTouch(document.getElementById('btn-jump'), 'Space', true);
+
+  function releaseAllTouches() {
+    for (const code of touchControls.keys()) releaseTouch(code);
+  }
+  document.addEventListener('touchend', (e) => {
+    if (e.touches.length === 0) releaseAllTouches();
+  }, { passive: true });
+  document.addEventListener('touchcancel', releaseAllTouches, { passive: true });
+  window.addEventListener('blur', releaseAllTouches);
 
   function syncTouch() {
     document.body.classList.toggle('show-touch', phoneLayout());
