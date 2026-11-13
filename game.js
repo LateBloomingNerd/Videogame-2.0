@@ -684,16 +684,16 @@
   const ROLL_MIN = 2.2;
 
   function beginRoll() {
+    if (Math.abs(player.vx) < ROLL_MIN) return false;
     const steer = facingDir();
-    const dir = steer !== 0
-      ? steer
-      : (Math.abs(player.vx) > 0.5 ? Math.sign(player.vx) : (player.facing || 1));
+    const dir = steer !== 0 ? steer : Math.sign(player.vx);
     player.facing = dir;
     player.rolling = true;
     player.rollTime = ROLL_FRAMES;
     rollArmed = false;
     if (!player.wading && Math.abs(player.vx) < 4.2) player.vx = dir * 4.2;
     sfx('roll');
+    return true;
   }
 
   function doJump() {
@@ -746,8 +746,7 @@
         if (player.rollTime <= 0) player.rolling = false;
       }
       if (wasGround && player.onGround && !player.jumping && downHeld() && rollArmed && !player.rolling) {
-        if (Math.abs(player.vx) >= ROLL_MIN) beginRoll();
-        else rollArmed = false;
+        if (!beginRoll()) rollArmed = false;
       }
 
       if (wasGround && player.onGround && player.rolling) {
@@ -2508,8 +2507,8 @@
 
   function helpText() {
     return phoneLayout()
-      ? 'Use the buttons to run, roll and jump · 3 lives'
-      : 'Arrows or A/D to run · Down to roll · Space or W to jump · 3 lives';
+      ? 'Run first, then the down button rolls · Jump button · 3 lives'
+      : 'Arrows or A/D to run · Down rolls only while moving · Space or W to jump · 3 lives';
   }
 
   function showScreen(mode) {
