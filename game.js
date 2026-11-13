@@ -1007,9 +1007,11 @@
       const hw = e.kind === 'bear' ? 40 : 20;
       const eb = { l: e.x - hw, r: e.x + hw, t: e.y - hh, b: e.y - 2 };
       if (!overlap(box, eb)) continue;
+      // Alleen de draaiende bal haalt ze uit: de rol over de grond, of de sprong.
+      // Rechtop op zijn voeten doet de aanraking niets meer.
       if (player.rolling) {
         squash(e, false);
-      } else if (player.vy > 0.3 && player.prevY <= e.y - hh + 12) {
+      } else if (player.jumping || player.airSpin) {
         squash(e, true);
       } else {
         hurt();
@@ -1225,6 +1227,8 @@
     if (player.invuln > 0) player.invuln--;
     updatePlatforms();
     carryPlayer();
+    // De sprong was deze frame al een bal, ook als hij in dezelfde frame landt.
+    player.airSpin = player.jumping;
     moveBody(true);
 
     if (player.wading && anim % 7 === 0) {
