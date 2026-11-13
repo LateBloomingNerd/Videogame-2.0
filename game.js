@@ -678,9 +678,10 @@
     return held.has('ArrowDown') || held.has('KeyS');
   }
 
-  // Eén keer indrukken rolt een kort stuk. Vasthouden rolt niet eindeloos door.
+  // Eén keer indrukken rolt een kort stuk, alleen als hij al een beetje loopt.
   let rollArmed = true;
   const ROLL_FRAMES = 34;
+  const ROLL_MIN = 2.2;
 
   function beginRoll() {
     const steer = facingDir();
@@ -745,7 +746,8 @@
         if (player.rollTime <= 0) player.rolling = false;
       }
       if (wasGround && player.onGround && !player.jumping && downHeld() && rollArmed && !player.rolling) {
-        beginRoll();
+        if (Math.abs(player.vx) >= ROLL_MIN) beginRoll();
+        else rollArmed = false;
       }
 
       if (wasGround && player.onGround && player.rolling) {
